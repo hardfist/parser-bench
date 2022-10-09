@@ -9,6 +9,7 @@ use std::time::Instant;
 use swc_common::{self, sync::Lrc};
 use swc_ecma_parser::{parse_file_as_module};
 fn main() {
+    let whole_start = Instant::now();
     let cwd = env::current_dir().unwrap();
     let globs = glob_with(
         "node_modules/three/src/**/*",
@@ -48,4 +49,6 @@ fn main() {
     }).collect();
     let duration = start.elapsed();
     println!("parallel duration: {:?}", duration);
+    let duration = whole_start.elapsed();
+    println!("whole duration: {:?}", duration);
 }
