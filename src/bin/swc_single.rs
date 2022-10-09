@@ -4,6 +4,7 @@ use swc_common::SourceMap;
 use std::env;
 use std::fs;
 use std::sync::Arc;
+use std::time::Instant;
 use swc_common::{self, sync::Lrc};
 use swc_ecma_parser::{parse_file_as_module};
 fn main() {
@@ -27,10 +28,13 @@ fn main() {
         }
         
     }).collect();
-    // let codes:Vec<_> = codes.iter().cycle().take(10*codes.len()).collect();
+    let codes:Vec<_> = codes.iter().cycle().take(10*codes.len()).collect();
+    let start = Instant::now();
     let cm: Lrc<SourceMap> = Arc::new(Default::default());    
     for (path,_code) in codes.iter() {
         let fm = cm.load_file(&path).expect("load file failed: {}");
         let _program = parse_file_as_module(&fm, Default::default(), Default::default(), Default::default(), &mut vec![]).unwrap();
     }
+    let duration = start.elapsed();
+    println!("duration: {:?}",duration);
 }

@@ -5,6 +5,7 @@ use rayon::prelude::*;
 use std::env;
 use std::fs;
 use std::sync::Arc;
+use std::time::Instant;
 use swc_common::{self, sync::Lrc};
 use swc_ecma_parser::{parse_file_as_module};
 fn main() {
@@ -28,11 +29,14 @@ fn main() {
         }
         
     }).collect();
-    // let codes:Vec<_> = codes.iter().cycle().take(10*codes.len()).collect();
+    let codes:Vec<_> = codes.iter().cycle().take(10*codes.len()).collect();
+    let start = Instant::now();
     let cm: Lrc<SourceMap> = Arc::new(Default::default());
     let _result:Vec<_> = codes.par_iter().map(|(path,_code)| {
         let fm = cm.load_file(&path).expect("load file failed: {}");
         let program = parse_file_as_module(&fm, Default::default(), Default::default(), Default::default(), &mut vec![]).unwrap();
         program
     }).collect();
+    let duration= start.elapsed();
+    println!("duration: {:?}",duration);
 }
