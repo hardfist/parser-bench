@@ -8,6 +8,7 @@ specifiers:
   esbuild: ^0.15.10
   glob: 8.0.3
   three: ^0.145.0
+  typescript: ^4.8.4
   webpack: ^5.74.0
   webpack-cli: ^4.10.0
 
@@ -19,6 +20,7 @@ dependencies:
   esbuild: 0.15.10
   glob: 8.0.3
   three: 0.145.0
+  typescript: 4.8.4
   webpack: 5.74.0_uyfefnmoltm2q5xjcbwsjgqzgq
   webpack-cli: 4.10.0_webpack@5.74.0
 
@@ -1605,6 +1607,12 @@ packages:
     engines: {node: '>=8.0'}
     dependencies:
       is-number: 7.0.0
+    dev: false
+
+  /typescript/4.8.4:
+    resolution: {integrity: sha512-QCh+85mCy+h0IGff8r5XWzOVSbBO+KfeYrMQh7NJ58QujwcE22u+NUSmUxqF+un70P9GXKxa2HCNiTTMJknyjQ==}
+    engines: {node: '>=4.2.0'}
+    hasBin: true
     dev: false
 
   /update-browserslist-db/1.0.10_browserslist@4.21.4:

@@ -4,13 +4,15 @@ const acorn = require('acorn');
 const esbuild = require('esbuild');
 const fs = require('fs');
 const babel = require('@babel/core');
-const files = glob.sync('./node_modules/three/src/**/*', { absolute: true, nodir: true });
-const list = files.map((x) => ({ file: x, code: fs.readFileSync(x, 'utf-8') }));
-let codes = [];
-for (let i = 0; i < 10; i++) {
-  codes = codes.concat(list);
-}
-async function main() {
+
+async function bench(pattern) {
+  const files = glob.sync(pattern, { absolute: true, nodir: true });
+  const list = files.map((x) => ({ file: x, code: fs.readFileSync(x, 'utf-8') }));
+  let codes = [];
+  for (let i = 0; i < 10; i++) {
+    codes = codes.concat(list);
+  }
+
   console.time('swc_code');
   for (const { _, code } of codes) {
     swc.parseSync(code);
@@ -44,6 +46,10 @@ async function main() {
     await esbuild.transform(code);
   }
   console.timeEnd('esbuild');
+}
+async function main() {
+  await bench('./node_modules/three/src/**/*');
+  await bench('./node_modules/typescript/lib/typescript.js');
 }
 
 main();
