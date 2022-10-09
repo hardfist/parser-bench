@@ -6,7 +6,6 @@ const fs = require('fs');
 const babel = require('@babel/core');
 const files = glob.sync('./node_modules/three/src/**/*', { absolute: true, nodir: true });
 const list = files.map((x) => ({ file: x, code: fs.readFileSync(x, 'utf-8') }));
-console.log(list[0].file);
 let codes = [];
 for (let i = 0; i < 10; i++) {
   codes = codes.concat(list);
