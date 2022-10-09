@@ -1,6 +1,7 @@
 const glob = require('glob');
 const swc = require('@swc/core');
 const acorn = require('acorn');
+const esbuild = require('esbuild');
 const fs = require('fs');
 const babel = require('@babel/core');
 const files = glob.sync('./node_modules/three/src/**/*', { absolute: true, nodir: true });
@@ -33,6 +34,12 @@ async function main() {
     babel.parse(code);
   }
   console.timeEnd('babel');
+
+  console.time('esbuild');
+  for (const code of codes) {
+    await esbuild.transform(code);
+  }
+  console.timeEnd('esbuild');
 }
 
 main();
