@@ -7,8 +7,18 @@ edition = "2021"
 
 [dependencies]
 glob ="*"
-swc = "*"
-swc_ecma_parser = "*"
-swc_common = "*"
+
 rayon = "*"
+swc = "0.226.21"
+swc_atoms = "0.4.14"
+swc_common = { version = "0.28.5", features = ["concurrent"] }
+swc_ecma_ast = "0.91.5"
+swc_ecma_parser = "0.119.9"
+swc_ecma_preset_env = "0.169.18"
+swc_ecma_transforms = { version = "0.193.18", features = [
+  "swc_ecma_transforms_module",
+  "swc_ecma_transforms_react",
+] }
+swc_ecma_utils = "0.102.10"
+swc_ecma_visit = "0.77.5"
 swc_ecma_codegen = "*"
