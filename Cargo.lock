@@ -921,6 +921,7 @@ dependencies = [
  "rayon",
  "swc",
  "swc_common",
+ "swc_ecma_codegen",
  "swc_ecma_parser",
 ]
 
