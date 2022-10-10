@@ -133,3 +133,5 @@ dist
 # Added by cargo
 
 /target
+
+trace-*

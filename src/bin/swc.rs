@@ -1,6 +1,14 @@
 use glob::glob_with;
 use glob::MatchOptions;
 use rayon::prelude::*;
+use swc_common::Mark;
+use swc_common::comments::SingleThreadedComments;
+use tracing::instrument;
+use tracing_chrome::ChromeLayerBuilder;
+use tracing_subscriber::EnvFilter;
+use tracing_subscriber::fmt;
+use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 use std::env;
 use std::fs;
 use std::sync::Arc;
@@ -11,8 +19,31 @@ use swc_ecma_codegen::{text_writer::JsWriter, Emitter};
 use swc_ecma_parser::parse_file_as_module;
 use swc_ecma_transforms::helpers::inject_helpers;
 use swc_ecma_transforms::helpers::Helpers;
+use swc_ecma_transforms::{react as swc_react, resolver, compat};
 use swc_ecma_visit::{as_folder, FoldWith, VisitAllWith, VisitWith};
+pub fn init_tracing() -> Option<tracing_chrome::FlushGuard>{
+  let is_enable_chrome_tracing:bool = std::env::var("CHROME_TRACE").ok().map_or(false, |_| true);
+  
+  let tracing = tracing_subscriber::registry().with(fmt::layer().pretty().with_file(false))
+  .with(EnvFilter::from_env("TRACE"));
+  let mut guard = None;
+  if is_enable_chrome_tracing {
+    let (chrome_layer,_guard) = ChromeLayerBuilder::new().build();
+    tracing.with(chrome_layer).init();
+    guard = Some(_guard);
+  }else {
+    tracing.init();
+  }
+  tracing::trace!("enable tracing");
+  guard
+}
+#[instrument()]
+fn test(){
+    println!("test instrument");
+}
 fn main() {
+    let guard = init_tracing();
+    test();
     let cwd = env::current_dir().unwrap();
     let globs = glob_with(
         "node_modules/three/src/**/*",
@@ -61,7 +92,14 @@ fn main() {
         .map(|ast| {
             swc_common::GLOBALS.set(&swc_common::Globals::default(), || {
                 swc_ecma_transforms::helpers::HELPERS
-                    .set(&Helpers::new(true), || ast.fold_with(&mut inject_helpers()))
+                    .set(&Helpers::new(true), || {
+                         let ast = ast.fold_with(&mut resolver(Mark::new(), Mark::new(), false));
+                         let ast = ast.fold_with(&mut swc_react::react::<SingleThreadedComments>(cm.clone(), None, swc_react::Options { ..Default::default()},Mark::new()));
+                         let ast = ast.fold_with(&mut inject_helpers());
+                         ast
+
+                    }
+                   )
             })
         })
         .collect();
@@ -93,4 +131,9 @@ fn main() {
     println!("codegen duration: {:?}", codegen_duration);
     let duration = start.elapsed();
     println!("duration: {:?}", duration);
+
+    if let Some(guard)= guard {
+        guard.flush();
+    }
+    tracing::info!("end");
 }
