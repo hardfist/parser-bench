@@ -1,6 +1,7 @@
 use glob::glob_with;
 use glob::MatchOptions;
 use rayon::prelude::*;
+use std::mem;
 use swc_common::Mark;
 use swc_common::comments::SingleThreadedComments;
 use tracing::event;
@@ -122,6 +123,7 @@ fn main() {
             let code = {
                 let mut buf = vec![];
                 {
+                    let emit_guard = span!(Level::TRACE, "emit").entered();
                     let mut emitter = Emitter {
                         cfg: swc_ecma_codegen::Config {
                             ..Default::default()
@@ -131,14 +133,19 @@ fn main() {
                         wr: JsWriter::new(cm.clone(), "\n", &mut buf, None),
                     };
                     emitter.emit_module(&m).unwrap();
+                    emit_guard.exit();
                 }
-                String::from_utf8_lossy(&buf).to_string()
+                let drop_guard = span!(Level::TRACE, "drop").entered();
+                // mem::forget(m);
+                drop(m);
+                drop_guard.exit();
+                String::from_utf8_lossy(&buf).to_string()  
             };
+            _guard.exit();
             code
         })
         .collect();
     codegen_enter.exit();
-    
     let codegen_duration = codegen_start.elapsed();
     println!("codegen duration: {:?}", codegen_duration);
     event!(Level::TRACE, "codegen_ended");
