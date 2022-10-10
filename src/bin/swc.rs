@@ -57,7 +57,7 @@ fn main() {
     println!("parse duration : {:?}", parse_duration);
     let transform_start = Instant::now();
     let modules: Vec<_> = modules
-        .into_iter()
+        .into_par_iter()
         .map(|ast| {
             swc_common::GLOBALS.set(&swc_common::Globals::default(), || {
                 swc_ecma_transforms::helpers::HELPERS
