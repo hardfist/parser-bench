@@ -1,7 +1,6 @@
 use glob::glob_with;
 use glob::MatchOptions;
 use rayon::prelude::*;
-use std::mem;
 use swc_common::Mark;
 use swc_common::comments::SingleThreadedComments;
 use tracing::event;
@@ -13,6 +12,7 @@ use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use std::env;
 use std::fs;
+use mimalloc_rust::GlobalMiMalloc;
 use std::sync::Arc;
 use std::time::Instant;
 use swc_common::SourceMap;
@@ -24,6 +24,8 @@ use swc_ecma_transforms::helpers::Helpers;
 use tracing::{span, Level};
 use swc_ecma_transforms::{react as swc_react, resolver, compat};
 use swc_ecma_visit::{as_folder, FoldWith, VisitAllWith, VisitWith};
+// #[global_allocator]
+// static GLOBAL: GlobalMiMalloc = GlobalMiMalloc;
 pub fn init_tracing() -> Option<tracing_chrome::FlushGuard>{
   let is_enable_chrome_tracing:bool = std::env::var("CHROME_TRACE").ok().map_or(false, |_| true);
   
@@ -45,11 +47,14 @@ fn test(){
     println!("test instrument");
 }
 fn main() {
+    let mut args = std::env::args().skip(1);
+    let pattern:String = args.next().unwrap_or("node_modules/three/src/**/*".into());
+    println!("pattern: {}", pattern);
     let guard = init_tracing();
     test();
     let cwd = env::current_dir().unwrap();
     let globs = glob_with(
-        "node_modules/typescript/lib/typescript.js",
+        &pattern,
         MatchOptions {
             ..Default::default()
         },
@@ -68,8 +73,9 @@ fn main() {
             }
         })
         .collect();
-    let codes: Vec<_> = codes.iter().cycle().take(8 * codes.len()).collect();
+    let codes: Vec<_> = codes.iter().cycle().take(10 * codes.len()).collect();
     println!("len: {}", codes.len());
+    /*---------------------- parse start -----------------*/
     let start = Instant::now();
     let cm: Lrc<SourceMap> = Arc::new(Default::default());
     let parse_enter = tracing::span!(Level::TRACE,"total_parse").entered();
@@ -91,6 +97,8 @@ fn main() {
         .collect();
     parse_enter.exit();
     let parse_duration = start.elapsed();
+    /*---------------------- parse end -----------------*/
+    /*---------------------- transform start -----------------*/
     println!("parse duration : {:?}", parse_duration);
     let transform_start = Instant::now();
     let transform_enter = span!(Level::TRACE, "total_transform").entered();
@@ -114,10 +122,15 @@ fn main() {
     transform_enter.exit();
     let transform_duration = transform_start.elapsed();
     println!("transform duration: {:?}", transform_duration);
+   /*---------------------- transform end -----------------*/
+
+
+
+    /*---------------------- codegen start -----------------*/
     let codegen_start = Instant::now();
     let codegen_enter = span!(Level::TRACE, "total_codegen").entered();
     let codes: Vec<_> = modules
-        .into_par_iter()
+        .par_iter()
         .map(|m| {
             let _guard = span!(Level::TRACE, "codegen").entered();
             let code = {
@@ -135,20 +148,30 @@ fn main() {
                     emitter.emit_module(&m).unwrap();
                     emit_guard.exit();
                 }
-                let drop_guard = span!(Level::TRACE, "drop").entered();
-                // mem::forget(m);
-                drop(m);
-                drop_guard.exit();
+                // let drop_guard = span!(Level::TRACE, "drop").entered();
+                // // mem::forget(m);
+                // drop(m);
+                // drop_guard.exit();
                 String::from_utf8_lossy(&buf).to_string()  
             };
             _guard.exit();
             code
         })
         .collect();
-    codegen_enter.exit();
     let codegen_duration = codegen_start.elapsed();
     println!("codegen duration: {:?}", codegen_duration);
+    codegen_enter.exit();
     event!(Level::TRACE, "codegen_ended");
+    /*---------------------- codegen end -----------------*/
+
+   /*---------------------- drop start -----------------*/
+    let drop_start = Instant::now();
+    let drop_module = span!(Level::TRACE, "drop_module").entered();
+    drop(modules);
+    drop_module.exit();
+    let drop_duration = drop_start.elapsed();
+    println!("drop duration: {:?}", drop_duration);
+    /*--------------------- drop end -----------------*/
     let duration = start.elapsed();
     println!("duration: {:?}", duration);
     if let Some(guard)= guard {
