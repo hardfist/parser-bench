@@ -3,6 +3,7 @@ use glob::MatchOptions;
 use rayon::prelude::*;
 use swc_common::Mark;
 use swc_common::comments::SingleThreadedComments;
+use tracing::event;
 use tracing::instrument;
 use tracing_chrome::ChromeLayerBuilder;
 use tracing_subscriber::EnvFilter;
@@ -19,6 +20,7 @@ use swc_ecma_codegen::{text_writer::JsWriter, Emitter};
 use swc_ecma_parser::parse_file_as_module;
 use swc_ecma_transforms::helpers::inject_helpers;
 use swc_ecma_transforms::helpers::Helpers;
+use tracing::{span, Level};
 use swc_ecma_transforms::{react as swc_react, resolver, compat};
 use swc_ecma_visit::{as_folder, FoldWith, VisitAllWith, VisitWith};
 pub fn init_tracing() -> Option<tracing_chrome::FlushGuard>{
@@ -46,7 +48,7 @@ fn main() {
     test();
     let cwd = env::current_dir().unwrap();
     let globs = glob_with(
-        "node_modules/three/src/**/*",
+        "node_modules/typescript/lib/typescript.js",
         MatchOptions {
             ..Default::default()
         },
@@ -65,13 +67,15 @@ fn main() {
             }
         })
         .collect();
-    let codes: Vec<_> = codes.iter().cycle().take(10 * codes.len()).collect();
+    let codes: Vec<_> = codes.iter().cycle().take(8 * codes.len()).collect();
     println!("len: {}", codes.len());
     let start = Instant::now();
     let cm: Lrc<SourceMap> = Arc::new(Default::default());
+    let parse_enter = tracing::span!(Level::TRACE,"total_parse").entered();
     let modules: Vec<_> = codes
         .par_iter()
         .map(|(path, _code)| {
+            let _guard = tracing::span!(Level::TRACE,"parse").entered();
             let fm = cm.clone().load_file(&path).expect("load file failed: {}");
             let m = parse_file_as_module(
                 &fm,
@@ -84,12 +88,15 @@ fn main() {
             m
         })
         .collect();
+    parse_enter.exit();
     let parse_duration = start.elapsed();
     println!("parse duration : {:?}", parse_duration);
     let transform_start = Instant::now();
+    let transform_enter = span!(Level::TRACE, "total_transform").entered();
     let modules: Vec<_> = modules
         .into_par_iter()
         .map(|ast| {
+            let _guard = span!(Level::TRACE, "transform").entered();
             swc_common::GLOBALS.set(&swc_common::Globals::default(), || {
                 swc_ecma_transforms::helpers::HELPERS
                     .set(&Helpers::new(true), || {
@@ -103,12 +110,15 @@ fn main() {
             })
         })
         .collect();
+    transform_enter.exit();
     let transform_duration = transform_start.elapsed();
     println!("transform duration: {:?}", transform_duration);
     let codegen_start = Instant::now();
+    let codegen_enter = span!(Level::TRACE, "total_codegen").entered();
     let codes: Vec<_> = modules
         .into_par_iter()
         .map(|m| {
+            let _guard = span!(Level::TRACE, "codegen").entered();
             let code = {
                 let mut buf = vec![];
                 {
@@ -127,11 +137,13 @@ fn main() {
             code
         })
         .collect();
+    codegen_enter.exit();
+    
     let codegen_duration = codegen_start.elapsed();
     println!("codegen duration: {:?}", codegen_duration);
+    event!(Level::TRACE, "codegen_ended");
     let duration = start.elapsed();
     println!("duration: {:?}", duration);
-
     if let Some(guard)= guard {
         guard.flush();
     }

@@ -16,3 +16,16 @@ swc:
 	@RAYON_NUM_THREADS=4 hyperfine --warmup 3 './target/release/swc_parallel'
 	@RAYON_NUM_THREADS=8 hyperfine --warmup 3 './target/release/swc_single'
 	@RAYON_NUM_THREADS=8 hyperfine --warmup 3 './target/release/swc_parallel'
+
+swc_1:
+	@RAYON_NUM_THREADS=1 samply record ./target/release/swc
+swc_8:
+	@RAYON_NUM_THREADS=8 samply record ./target/release/swc
+swc_trace_1:
+	@RAYON_NUM_THREADS=1 TRACE=TRACE CHROME_TRACE=1  ./target/release/swc
+swc_trace_2:
+	@RAYON_NUM_THREADS=2 TRACE=TRACE CHROME_TRACE=1  ./target/release/swc
+swc_trace_4:
+	@RAYON_NUM_THREADS=4 TRACE=TRACE CHROME_TRACE=1  ./target/release/swc
+swc_trace_8:
+	@RAYON_NUM_THREADS=8 TRACE=TRACE CHROME_TRACE=1  ./target/release/swc
