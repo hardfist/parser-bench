@@ -21,6 +21,8 @@ swc_1:
 	@RAYON_NUM_THREADS=1 samply record ./target/release/swc
 swc_8:
 	@RAYON_NUM_THREADS=8 samply record ./target/release/swc
+swc_10:
+	@RAYON_NUM_THREADS=8 samply record ./target/release/swc
 swc_trace_1:
 	@RAYON_NUM_THREADS=1 TRACE=TRACE CHROME_TRACE=1  ./target/release/swc
 swc_trace_2:
@@ -29,3 +31,5 @@ swc_trace_4:
 	@RAYON_NUM_THREADS=4 TRACE=TRACE CHROME_TRACE=1  ./target/release/swc
 swc_trace_8:
 	@RAYON_NUM_THREADS=8 TRACE=TRACE CHROME_TRACE=1  ./target/release/swc
+swc_trace_10:
+	@RAYON_NUM_THREADS=10 TRACE=TRACE CHROME_TRACE=1  ./target/release/swc
