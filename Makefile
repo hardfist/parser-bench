@@ -33,3 +33,8 @@ swc_trace_8:
 	@RAYON_NUM_THREADS=8 TRACE=TRACE CHROME_TRACE=1  ./target/release/swc
 swc_trace_10:
 	@RAYON_NUM_THREADS=10 TRACE=TRACE CHROME_TRACE=1  ./target/release/swc
+
+
+drop_problem:
+	@cargo build --release
+	@samply record ./target/release/swc ./node_modules/typescript/lib/typescript.js
