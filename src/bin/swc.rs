@@ -24,8 +24,8 @@ use swc_ecma_transforms::helpers::Helpers;
 use tracing::{span, Level};
 use swc_ecma_transforms::{react as swc_react, resolver, compat};
 use swc_ecma_visit::{as_folder, FoldWith, VisitAllWith, VisitWith};
-// #[global_allocator]
-// static GLOBAL: GlobalMiMalloc = GlobalMiMalloc;
+#[global_allocator]
+static GLOBAL: GlobalMiMalloc = GlobalMiMalloc;
 pub fn init_tracing() -> Option<tracing_chrome::FlushGuard>{
   let is_enable_chrome_tracing:bool = std::env::var("CHROME_TRACE").ok().map_or(false, |_| true);
   
