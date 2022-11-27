@@ -3,8 +3,12 @@ use glob::MatchOptions;
 use mimalloc_rust::GlobalMiMalloc;
 use rayon::prelude::*;
 use swc::BoolOrDataConfig;
+use swc::TransformOutput;
+use swc::config::SourceMapsConfig;
 use std::env;
 use std::fs;
+use std::path::PathBuf;
+use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Instant;
 use swc::Compiler as swcCompiler;
@@ -76,131 +80,38 @@ fn main() {
             }
         })
         .collect();
-    let codes: Vec<_> = codes.iter().cycle().take(10 * codes.len()).collect();
+    let codes: Vec<_> = codes.iter().cycle().take(1).collect();
     println!("len: {}", codes.len());
+    
     /*-----------------------minify start ----------------*/
-    let cm: Lrc<SourceMap> = Arc::new(Default::default());
+    let cm: Lrc<SourceMap> =Arc::new(Default::default());
     let compiler = swcCompiler::new(cm.clone());
     let start = Instant::now();
-    let result:Vec<_> = codes.par_iter().map(|(path, code)| {
+    let result:Vec<_> = codes.iter().map(|(path, code)| {
         let fm = cm.clone().load_file(&path).expect("load file failed: {}");
-        swc::try_with_handler(cm.clone(), Default::default(), |handler| {
+        swc_common::GLOBALS.set(&swc_common::Globals::new(), || {
+         let res = swc::try_with_handler(cm.clone(), Default::default(), |handler| {
             compiler.minify(
                 fm,
                 handler,
                 &swc::config::JsMinifyOptions {
-                    source_map: BoolOrDataConfig::from_bool(false),
+                    source_map: BoolOrDataConfig::from_bool(true),
+                     emit_source_map_columns: true,
                     ..Default::default()
                 },
             )
-        })
+        });
+        let TransformOutput{code, map}  = res.unwrap();
+        fs::write("/Users/yangjian/github/parser-bench/a.js", code).unwrap();;
+        fs::write("/Users/yangjian/github/parser-bench/a.js.map", map.unwrap()).unwrap();
+        return ();
+        });
+
     }).collect();
+
     let minify_duration = start.elapsed();
     println!("minify duration : {:?}", minify_duration);
-    /*-----------------------minify end ------------------*/
-    /*---------------------- parse start -----------------*/
-    let start = Instant::now();
-    let cm: Lrc<SourceMap> = Arc::new(Default::default());
-    let parse_enter = tracing::span!(Level::TRACE, "total_parse").entered();
-    let modules: Vec<_> = codes
-        .par_iter()
-        .map(|(path, _code)| {
-            let _guard = tracing::span!(Level::TRACE, "parse").entered();
-            let fm = cm.clone().load_file(&path).expect("load file failed: {}");
-            let m = parse_file_as_module(
-                &fm,
-                Default::default(),
-                Default::default(),
-                Default::default(),
-                &mut vec![],
-            )
-            .unwrap();
-            m
-        })
-        .collect();
-    parse_enter.exit();
-    let parse_duration = start.elapsed();
-    /*---------------------- parse end -----------------*/
-    /*---------------------- transform start -----------------*/
-    println!("parse duration : {:?}", parse_duration);
-    let transform_start = Instant::now();
-    let transform_enter = span!(Level::TRACE, "total_transform").entered();
-    let modules: Vec<_> = modules
-        .into_par_iter()
-        .map(|ast| {
-            let _guard = span!(Level::TRACE, "transform").entered();
-            swc_common::GLOBALS.set(&swc_common::Globals::default(), || {
-                swc_ecma_transforms::helpers::HELPERS.set(&Helpers::new(true), || {
-                    let ast = ast.fold_with(&mut resolver(Mark::new(), Mark::new(), false));
-                    let ast = ast.fold_with(&mut swc_react::react::<SingleThreadedComments>(
-                        cm.clone(),
-                        None,
-                        swc_react::Options {
-                            ..Default::default()
-                        },
-                        Mark::new(),
-                    ));
-                    let ast = ast.fold_with(&mut inject_helpers());
-                    ast
-                })
-            })
-        })
-        .collect();
-    transform_enter.exit();
-    let transform_duration = transform_start.elapsed();
-    println!("transform duration: {:?}", transform_duration);
-    /*---------------------- transform end -----------------*/
+    return;
+   
 
-    /*---------------------- codegen start -----------------*/
-    let codegen_start = Instant::now();
-    let codegen_enter = span!(Level::TRACE, "total_codegen").entered();
-    let codes: Vec<_> = modules
-        .par_iter()
-        .map(|m| {
-            let _guard = span!(Level::TRACE, "codegen").entered();
-            let code = {
-                let mut buf = vec![];
-                {
-                    let emit_guard = span!(Level::TRACE, "emit").entered();
-                    let mut emitter = Emitter {
-                        cfg: swc_ecma_codegen::Config {
-                            ..Default::default()
-                        },
-                        cm: cm.clone(),
-                        comments: None,
-                        wr: JsWriter::new(cm.clone(), "\n", &mut buf, None),
-                    };
-                    emitter.emit_module(&m).unwrap();
-                    emit_guard.exit();
-                }
-                // let drop_guard = span!(Level::TRACE, "drop").entered();
-                // // mem::forget(m);
-                // drop(m);
-                // drop_guard.exit();
-                String::from_utf8_lossy(&buf).to_string()
-            };
-            _guard.exit();
-            code
-        })
-        .collect();
-    let codegen_duration = codegen_start.elapsed();
-    println!("codegen duration: {:?}", codegen_duration);
-    codegen_enter.exit();
-    event!(Level::TRACE, "codegen_ended");
-    /*---------------------- codegen end -----------------*/
-
-    /*---------------------- drop start -----------------*/
-    let drop_start = Instant::now();
-    let drop_module = span!(Level::TRACE, "drop_module").entered();
-    drop(modules);
-    drop_module.exit();
-    let drop_duration = drop_start.elapsed();
-    println!("drop duration: {:?}", drop_duration);
-    /*--------------------- drop end -----------------*/
-    let duration = start.elapsed();
-    println!("duration: {:?}", duration);
-    if let Some(guard) = guard {
-        guard.flush();
-    }
-    tracing::info!("end");
 }
